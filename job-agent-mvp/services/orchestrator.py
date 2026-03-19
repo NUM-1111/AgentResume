@@ -31,6 +31,12 @@ class JobAgentOrchestrator:
             jd_keywords=jd_analysis.get("keywords", []),
         )
 
+        sources = {
+            "jd_analysis": jd_analysis.pop("_source", "unknown"),
+            "match_analysis": match_analysis.pop("_source", "unknown"),
+            "project_rewrite": project_rewrite.pop("_source", "unknown"),
+        }
+
         return {
             "jd_analysis": jd_analysis,
             "candidate_profile": candidate_profile,
@@ -40,6 +46,8 @@ class JobAgentOrchestrator:
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "model_enabled": self.llm_client.enabled,
                 "model": self.llm_client.model,
+                "base_url": self.llm_client.base_url,
+                "sources": sources,
             },
         }
 

@@ -27,12 +27,14 @@ class MatchEvaluator:
             "请按 JSON Schema 给出匹配分析。"
         )
 
-        return self.llm_client.generate_structured(
+        data, source = self.llm_client.generate_structured(
             system_prompt=prompt,
             user_prompt=user_prompt,
             schema_model=MatchAnalysis,
             fallback_data=fallback,
         )
+        data["_source"] = source
+        return data
 
     @staticmethod
     def _fallback_match(

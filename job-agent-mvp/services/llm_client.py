@@ -1,6 +1,7 @@
 import json
+import logging
 import os
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional, Tuple, Type
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -9,21 +10,9 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-# 这个类是用来调用LLM的，它有以下几个功能：
-# 1. 它有api_key和base_url，这两个是用来调用LLM的。
-# 2. 它有model，这个是用来选择LLM模型的。
-# 3. 它有enabled，这个是用来判断是否启用LLM的。
-# 4. 它有client，这个是用来调用LLM的。
-# 5. 它有generate_structured，这个是用来生成结构化输出的。
-# 6. 它有fallback_data，这个是用来返回本地fallback的。
-# 7. 它有schema_model，这个是用来约束输出的。
-# 8. 它有system_prompt，这个是用来提示LLM的。
-# 9. 它有user_prompt，这个是用来输入的。
-# 10. 它有response_format，这个是用来约束输出的。
-# 11. 它有messages，这个是用来输入的。
-# 12. 它有content，这个是用来输出的。
-# 13. 它有data，这个是用来输出的。
-# 14. 它有validated，这个是用来输出的。
+logger = logging.getLogger(__name__)
+
+
 class LLMClient:
     def __init__(self) -> None:
         self.api_key = os.getenv("OPENAI_API_KEY", "").strip()
@@ -34,6 +23,9 @@ class LLMClient:
         self._client: Optional[OpenAI] = None
         if self.enabled:
             self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            logger.info("LLMClient 已启用，模型: %s，接口: %s", self.model, self.base_url)
+        else:
+            logger.warning("LLMClient 未启用：OPENAI_API_KEY 为空，将使用本地 fallback")
 
     def generate_structured(
         self,
@@ -42,35 +34,34 @@ class LLMClient:
         user_prompt: str,
         schema_model: Type[BaseModel],
         fallback_data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> Tuple[Dict[str, Any], str]:
         """
         统一结构化输出入口。
-        - 有 API Key: 优先调用 LLM + JSON Schema 约束
-        - 无 API Key 或调用失败: 返回本地 fallback
+        返回 (result_dict, source)，source 为 "llm" 或 "fallback:<原因>"
         """
         if not self.enabled or not self._client:
-            return fallback_data
+            return fallback_data, "fallback:no_api_key"
 
         try:
+            # 将 JSON Schema 注入 system prompt，兼容不支持 json_schema response_format 的接口（如 DeepSeek）
+            schema_hint = (
+                f"\n\n请严格按照以下 JSON Schema 输出，只返回合法 JSON，不要有任何额外文字：\n"
+                f"{json.dumps(schema_model.model_json_schema(), ensure_ascii=False, indent=2)}"
+            )
             response = self._client.chat.completions.create(
                 model=self.model,
                 temperature=0.2,
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": schema_model.__name__,
-                        "schema": schema_model.model_json_schema(),
-                    },
-                },
+                response_format={"type": "json_object"},
                 messages=[
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": system_prompt + schema_hint},
                     {"role": "user", "content": user_prompt},
                 ],
             )
             content = response.choices[0].message.content or "{}"
             data = json.loads(content)
             validated = schema_model.model_validate(data)
-            return validated.model_dump()
-        except Exception:
-            return fallback_data
-
+            return validated.model_dump(), "llm"
+        except Exception as exc:
+            reason = type(exc).__name__ + ": " + str(exc)
+            logger.error("LLM 调用失败，降级到 fallback。原因: %s", reason)
+            return fallback_data, f"fallback:{reason}"

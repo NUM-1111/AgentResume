@@ -20,12 +20,14 @@ class JDAnalyzer:
             f"岗位 JD 原文：\n{jd_text}\n\n"
             "请严格按 JSON Schema 输出。"
         )
-        return self.llm_client.generate_structured(
+        data, source = self.llm_client.generate_structured(
             system_prompt=prompt,
             user_prompt=user_prompt,
             schema_model=JDAnalysis,
             fallback_data=fallback,
         )
+        data["_source"] = source
+        return data
 
     def _fallback_jd_analysis(self, jd_text: str, target_role: str) -> Dict:
         text = normalize_text(jd_text)

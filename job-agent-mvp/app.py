@@ -60,8 +60,37 @@ if st.button("开始分析", type="primary"):
         with st.expander("候选人结构化信息（调试视图）", expanded=False):
             st.json(result["candidate_profile"], expanded=False)
 
-        st.caption(
-            f"模型状态: {'已启用' if result['meta']['model_enabled'] else '未启用(本地降级)'} | "
-            f"模型: {result['meta']['model']}"
-        )
+        # ── 模型 / Fallback 状态面板 ──────────────────────────────────
+        meta = result["meta"]
+        sources = meta.get("sources", {})
+
+        def _source_badge(src: str) -> str:
+            if src == "llm":
+                return "✅ 模型分析"
+            if src == "fallback:no_api_key":
+                return "⚠️ Fallback（无 API Key）"
+            if src.startswith("fallback:"):
+                return f"❌ Fallback（调用失败）"
+            return src
+
+        with st.expander("📊 分析来源 & 模型状态", expanded=True):
+            if meta["model_enabled"]:
+                st.success(f"模型已启用：`{meta['model']}`  |  接口：`{meta['base_url']}`")
+            else:
+                st.error("模型未启用 — OPENAI_API_KEY 为空，所有结果均来自本地规则 fallback")
+                st.info("请在 `job-agent-mvp/.env` 中填写 `OPENAI_API_KEY` 后重启服务")
+
+            col_a, col_b, col_c = st.columns(3)
+            col_a.metric("JD 分析", _source_badge(sources.get("jd_analysis", "?")))
+            col_b.metric("匹配分析", _source_badge(sources.get("match_analysis", "?")))
+            col_c.metric("项目改写", _source_badge(sources.get("project_rewrite", "?")))
+
+            # 若有调用失败，展示具体原因
+            failed = {k: v for k, v in sources.items() if v.startswith("fallback:") and v != "fallback:no_api_key"}
+            if failed:
+                st.warning("以下模块调用 LLM 失败，已降级到本地规则：")
+                for module, reason in failed.items():
+                    st.code(f"{module}: {reason}", language="text")
+
+        st.caption(f"生成时间: {meta['generated_at']}")
 

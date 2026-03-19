@@ -27,12 +27,14 @@ class ResumeRewriter:
             f"候选人项目原文：\n{candidate_text}\n\n"
             "请按 JSON Schema 输出项目改写结果。"
         )
-        return self.llm_client.generate_structured(
+        data, source = self.llm_client.generate_structured(
             system_prompt=prompt,
             user_prompt=user_prompt,
             schema_model=ProjectRewrite,
             fallback_data=fallback,
         )
+        data["_source"] = source
+        return data
 
     @staticmethod
     def _fallback_rewrite(candidate_text: str, target_role: str, jd_keywords: List[str]) -> Dict[str, Any]:
