@@ -57,6 +57,7 @@ def parse_candidate_text(candidate_text: str) -> Dict[str, List[str] | str]:
     }
 
 
+# 这个函数是用来去重并保持顺序的
 def dedupe_keep_order(items: List[str]) -> List[str]:
     seen = set()
     result: List[str] = []

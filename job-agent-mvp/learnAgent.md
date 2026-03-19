@@ -17,11 +17,13 @@
 这个项目把上面 3 件事变成一次接口/一次按钮点击的自动流程：
 
 输入：
+
 - `jd_text`：岗位 JD 文本
 - `candidate_text`：候选人背景/简历文本（自由格式）
 - `target_role`：目标岗位方向（用于引导分析视角）
 
 输出（结构化 JSON）：
+
 - `jd_analysis`：JD 解析结果
 - `candidate_profile`：候选人信息结构化结果（本地规则解析）
 - `match_analysis`：匹配分析结果
@@ -63,7 +65,7 @@
 - `sample_data/`：示例输入（帮助你快速跑通）
 
 如果你只能记住一句话：  
-**入口在 `main.py/app.py`，流程在 `services/orchestrator.py`，智能在 `services/* + prompts/* + schemas/*`。**
+**入口在 `main.py/app.py`，流程在 `services/orchestrator.py`，智能在 `services/* + prompts/* + schemas/`*。**
 
 ---
 
@@ -78,7 +80,6 @@
 - **网页方式**：`streamlit run app.py`
   - 用户在页面里填 `jd_text`、`candidate_text`，选择 `target_role`
   - 点击“开始分析”
-
 - **接口方式**：`uvicorn main:app --reload --port 8000`
   - 客户端请求 `POST /analyze`，传同样 3 个字段
 
@@ -88,7 +89,7 @@
 
 ---
 
-### 4.2 第 1 步：编排器 orchestrator 做了什么？
+### 4.2（重要！） 第 1 步：编排器 orchestrator 做了什么？
 
 `services/orchestrator.py` 的 `JobAgentOrchestrator.run()` 固定按顺序做 4 件事：
 
@@ -149,19 +150,22 @@
 
 ---
 
-### 4.5 第 4 步：匹配分析模块怎么工作？
+### 4.5 第 4 步：匹配分析模块怎么工作？  ---后续优化： 如何让匹配不死板
 
 文件：`services/match_evaluator.py`
 
 输入：
+
 - `jd_analysis`（上一步产出）
 - `candidate_profile`（候选人结构化产出）
 - `target_role`
 
 输出 Schema：
+
 - `schemas/match_schema.py` 的 `MatchAnalysis`
 
 思路：
+
 - 有 Key：让 LLM 按 prompt + schema 生成“高匹配点/缺口/建议…”
 - 无 Key：做一个非常朴素的 set 对比：
   - JD 的 `required_skills + keywords` 当作“岗位技能集合”
@@ -179,18 +183,22 @@
 文件：`services/resume_rewriter.py`
 
 输入：
+
 - `candidate_text`（原始文本）
 - `target_role`
 - `jd_keywords`（从 `jd_analysis` 里拿到的关键词）
 
 输出 Schema：
+
 - `schemas/rewrite_schema.py` 的 `ProjectRewrite`
 
 提示词 `prompts/project_rewrite.md` 强调：
+
 - **严禁编造事实**
 - 建议“动作-方法-结果”，尽量量化；没数据就提示补充
 
 fallback 的做法：
+
 - 把候选人 bullet 前几条取出来
 - 套个模板“围绕目标岗位，在真实项目中完成：xxx”
 - notes 里明确：仅优化表达，不新增事实；关键词不足就提示先完善 JD
@@ -204,14 +212,14 @@ fallback 的做法：
 它做了三件非常工程化的事情：
 
 1. **统一读取环境变量**
-   - `OPENAI_API_KEY` 有值才启用模型
-   - `OPENAI_MODEL` 默认 `gpt-4o-mini`
+  - `OPENAI_API_KEY` 有值才启用模型
+  - `OPENAI_MODEL` 默认 `gpt-4o-mini`
 2. **统一“结构化输出”调用方式**
-   - 每个模块都传入一个 Pydantic model
-   - 它把 model 转成 JSON Schema，并强制模型按 schema 输出
+  - 每个模块都传入一个 Pydantic model
+  - 它把 model 转成 JSON Schema，并强制模型按 schema 输出
 3. **统一异常与降级**
-   - 没 key：直接返回 fallback
-   - 调用失败：直接返回 fallback
+  - 没 key：直接返回 fallback
+  - 调用失败：直接返回 fallback
 
 你可以把它理解成 Agent 项目里的“LLM SDK Adapter（适配层）”：
 
@@ -224,11 +232,11 @@ fallback 的做法：
 
 你可以按这个顺序说（面试/复盘都能用）：
 
-1. 这是一个求职投递流程的任务型 Agent，输入 JD + 候选人文本 + 目标岗位方向，输出 JD 解析、候选人结构化、匹配分析、项目改写四块结构化结果。  
-2. 项目有两个入口：FastAPI 的 `/analyze` 和 Streamlit 页面，但它们都只负责收集输入并调用 orchestrator。  
-3. 核心是 `services/orchestrator.py`：按固定顺序执行 4 个模块并汇总结果。  
-4. 每个模块如果启用了 API Key，就通过 `LLMClient.generate_structured()` 按 Pydantic schema 强制结构化输出；否则走本地 fallback，保证 MVP 可运行。  
-5. Prompt 文件规定口径（比如“不能编造事实”“信息不足要写出来”），Schema 文件规定输出字段，二者一起让输出可控、可消费。  
+1. 这是一个求职投递流程的任务型 Agent，输入 JD + 候选人文本 + 目标岗位方向，输出 JD 解析、候选人结构化、匹配分析、项目改写四块结构化结果。
+2. 项目有两个入口：FastAPI 的 `/analyze` 和 Streamlit 页面，但它们都只负责收集输入并调用 orchestrator。
+3. 核心是 `services/orchestrator.py`：按固定顺序执行 4 个模块并汇总结果。
+4. 每个模块如果启用了 API Key，就通过 `LLMClient.generate_structured()` 按 Pydantic schema 强制结构化输出；否则走本地 fallback，保证 MVP 可运行。
+5. Prompt 文件规定口径（比如“不能编造事实”“信息不足要写出来”），Schema 文件规定输出字段，二者一起让输出可控、可消费。
 
 ---
 
@@ -237,19 +245,23 @@ fallback 的做法：
 把这段当“配方”：
 
 ### 7.1 先定义你要输出什么（Schema 先行）
+
 - 为每个子任务写一个 Pydantic model（例如 JDAnalysis、MatchAnalysis…）
 - 字段尽量少但足够用，默认值要合理（保证稳定）
 
-### 7.2 再写每步的 prompt（规则写在 prompt 里）
+### 7.2 再写每步的 prompt（规则写在 prompt   里）
+
 - 明确硬约束：不能编造、信息不足要写缺失项
 - 明确输出风格：中文、列表、可执行
 - 明确必须符合 schema
 
 ### 7.3 做一个 LLMClient 适配层
+
 - 统一模型调用（温度、错误处理、schema 约束）
 - 统一降级 fallback（没有 key 也能跑通）
 
 ### 7.4 写每个服务模块（一个模块只做一件事）
+
 - 模块结构建议固定为：
   - 读 prompt
   - 组 user_prompt
@@ -257,11 +269,13 @@ fallback 的做法：
   - 调 `LLMClient.generate_structured(schema_model=..., fallback_data=...)`
 
 ### 7.5 写 orchestrator（把步骤串起来）
+
 - 把你的任务链路按顺序写死（MVP 阶段越固定越好）
 - 每步输出作为下一步输入的一部分
 - 最终返回一个 dict/JSON，前端/接口只负责展示
 
 ### 7.6 做两个入口（可选，但很实用）
+
 - API 入口（FastAPI）：方便接入别的系统/脚本
 - 页面入口（Streamlit）：方便你自己快速体验迭代
 
@@ -271,46 +285,64 @@ fallback 的做法：
 
 下面这些优化点基本覆盖了从 MVP 到可用产品的路线：
 
+### 8.0 利用 **依赖注入/模型选择** 进行agent调用
+
+
+
 ### 8.1 让它变成“多轮 Agent”（目前是单轮）
+
 现状：`/analyze` 一次性输入三段大文本。  
 优化：
+
 - 如果 `candidate_profile.missing_items` 不为空，让系统返回“追问问题列表”，引导用户补充材料
 - 或在 Streamlit 里做多轮表单（逐步补齐技能/项目/指标）
 
 ### 8.2 提升候选人结构化质量（目前规则很轻）
+
 现状：`utils/parser.py` 用关键词+分段，容易漏项/混项。  
 优化：
+
 - 增加更强的解析：比如先让 LLM 做“简历结构化抽取”（同样用 schema 约束）
 - 兼容更多格式（PDF/Docx/Markdown），并把原文与抽取结果同时保留以便追溯
 
 ### 8.3 更严谨的“事实边界”控制
+
 现状：依靠 prompt 约束“不编造”。  
 优化：
+
 - 在改写前做“事实清单抽取”，改写后做“事实一致性校验”（差异则标红/拒绝输出）
 - 对敏感项（指标、技术栈、时间）做白名单校验：仅允许来自原文的值
 
 ### 8.4 让输出更“可投递/可复制”
+
 现状：输出是 JSON，页面展示为 JSON。  
 优化：
+
 - 输出同时提供 Markdown 版本（简历可直接复制）
 - 支持导出 Docx/PDF
 - 改写结果按“STAR/三段式（动作-方法-结果）”模板排版
 
 ### 8.5 评估与可观测性（工程化必做）
+
 现状：失败就 fallback，没日志/没指标。  
 优化：
+
 - 记录每步耗时、是否走 fallback、prompt 版本、模型版本
 - 做离线评测集（sample_data 扩展成 tests），对比改动前后质量
 
 ### 8.6 让它支持“多材料检索”（README 提到的向量检索）
+
 现状：只有一段 candidate_text。  
 优化：
+
 - 把候选人多份材料切块入库（向量检索）
 - 每次针对 JD 关键词检索最相关片段再喂给改写/匹配模块（RAG）
 
 ### 8.7 更好的错误处理与用户提示
+
 现状：异常直接 fallback，没有解释原因。  
 优化：
+
 - 返回 `meta.errors` 或 `meta.warnings`，说明是“无 key”“超时”“schema 校验失败”等
 - 在页面提示用户如何修复（例如提示配置 `.env`）
 
@@ -320,11 +352,11 @@ fallback 的做法：
 
 你不需要改代码也能练习理解：
 
-1. 打开 `services/orchestrator.py`，把 `run()` 的 4 步顺序背下来  
-2. 打开 `services/jd_analyzer.py`，找“读 prompt → user_prompt → schema → fallback → generate_structured”这条模式  
-3. 同样方式看 `match_evaluator.py`、`resume_rewriter.py`，你会发现它们结构几乎一致  
-4. 打开 `schemas/*.py`，把每个模块输出字段背下来（这就是稳定 API）  
-5. 打开 `prompts/*.md`，把“硬性约束”背下来（这就是产品规则）  
+1. 打开 `services/orchestrator.py`，把 `run()` 的 4 步顺序背下来
+2. 打开 `services/jd_analyzer.py`，找“读 prompt → user_prompt → schema → fallback → generate_structured”这条模式
+3. 同样方式看 `match_evaluator.py`、`resume_rewriter.py`，你会发现它们结构几乎一致
+4. 打开 `schemas/*.py`，把每个模块输出字段背下来（这就是稳定 API）
+5. 打开 `prompts/*.md`，把“硬性约束”背下来（这就是产品规则）
 
 做到这 5 步，你就能口述 80% 以上。
 
@@ -333,4 +365,3 @@ fallback 的做法：
 ## 10. 一句话总结（你应该带走的心智模型）
 
 **Agent 应用 ≈ 固定流程编排（orchestrator） + 可控的结构化输出（schema） + 可复用的模型调用层（LLMClient） + 写清楚规则的提示词（prompts） + 随时可运行的降级逻辑（fallback）。**
-

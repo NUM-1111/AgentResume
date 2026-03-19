@@ -5,7 +5,7 @@ from schemas.jd_schema import JDAnalysis
 from services.llm_client import LLMClient
 from utils.parser import dedupe_keep_order, extract_bullets, normalize_text
 
-
+# 这个类是用来解析JD的
 class JDAnalyzer:
     def __init__(self, llm_client: LLMClient) -> None:
         self.llm_client = llm_client
@@ -63,6 +63,7 @@ class JDAnalyzer:
             ],
         ).model_dump()
 
+    # 这个函数是用来推断岗位名称的
     @staticmethod
     def _infer_title(lines: List[str], target_role: str) -> str:
         for line in lines[:10]:
@@ -70,6 +71,7 @@ class JDAnalyzer:
                 return line[:40]
         return target_role or "未明确"
 
+    # 这个函数是用来选择关键词的
     @staticmethod
     def _pick_by_keywords(lines: List[str], keywords: List[str], limit: int) -> List[str]:
         hits: List[str] = []
@@ -79,6 +81,7 @@ class JDAnalyzer:
                 hits.append(line)
         return dedupe_keep_order(hits)[:limit]
 
+    # 这个函数是用来提取关键词的
     @staticmethod
     def _extract_keywords(text_lower: str, target_role: str) -> List[str]:
         candidates = [

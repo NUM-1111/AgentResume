@@ -9,7 +9,21 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-
+# 这个类是用来调用LLM的，它有以下几个功能：
+# 1. 它有api_key和base_url，这两个是用来调用LLM的。
+# 2. 它有model，这个是用来选择LLM模型的。
+# 3. 它有enabled，这个是用来判断是否启用LLM的。
+# 4. 它有client，这个是用来调用LLM的。
+# 5. 它有generate_structured，这个是用来生成结构化输出的。
+# 6. 它有fallback_data，这个是用来返回本地fallback的。
+# 7. 它有schema_model，这个是用来约束输出的。
+# 8. 它有system_prompt，这个是用来提示LLM的。
+# 9. 它有user_prompt，这个是用来输入的。
+# 10. 它有response_format，这个是用来约束输出的。
+# 11. 它有messages，这个是用来输入的。
+# 12. 它有content，这个是用来输出的。
+# 13. 它有data，这个是用来输出的。
+# 14. 它有validated，这个是用来输出的。
 class LLMClient:
     def __init__(self) -> None:
         self.api_key = os.getenv("OPENAI_API_KEY", "").strip()
