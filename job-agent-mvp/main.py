@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from services.analysis_logger import get_log, list_logs
 from services.orchestrator import JobAgentOrchestrator
 
 
@@ -26,4 +27,23 @@ def analyze(payload: AnalyzeRequest) -> dict:
         candidate_text=payload.candidate_text,
         target_role=payload.target_role,
     )
+
+
+# ---------------------------------------------------------------------------
+# 日志查询接口
+# ---------------------------------------------------------------------------
+
+@app.get("/logs")
+def logs(limit: int = 50) -> dict:
+    """返回最近 limit 条分析日志的摘要列表。"""
+    return {"logs": list_logs(limit=limit)}
+
+
+@app.get("/logs/{log_id}")
+def log_detail(log_id: str) -> dict:
+    """按 log_id 返回完整分析记录。"""
+    record = get_log(log_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"log_id '{log_id}' not found")
+    return record
 

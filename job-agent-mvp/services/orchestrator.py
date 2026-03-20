@@ -1,11 +1,15 @@
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+from services.analysis_logger import save_analysis
 from services.candidate_profiler import CandidateProfiler
 from services.jd_analyzer import JDAnalyzer
 from services.llm_client import LLMClient
 from services.match_evaluator import MatchEvaluator
 from services.resume_rewriter import ResumeRewriter
+
+logger = logging.getLogger(__name__)
 
 
 class JobAgentOrchestrator:
@@ -17,7 +21,14 @@ class JobAgentOrchestrator:
         self.match_evaluator = MatchEvaluator(llm_client)
         self.resume_rewriter = ResumeRewriter(llm_client)
 
-    def run(self, *, jd_text: str, candidate_text: str, target_role: str) -> Dict[str, Any]:
+    def run(
+        self,
+        *,
+        jd_text: str,
+        candidate_text: str,
+        target_role: str,
+        save_log: bool = True,
+    ) -> Dict[str, Any]:
         jd_analysis = self.jd_analyzer.analyze(jd_text=jd_text, target_role=target_role)
         candidate_profile = self.candidate_profiler.profile(candidate_text)
         match_analysis = self.match_evaluator.evaluate(
@@ -38,7 +49,7 @@ class JobAgentOrchestrator:
             "project_rewrite": project_rewrite.pop("_source", "unknown"),
         }
 
-        return {
+        result = {
             "jd_analysis": jd_analysis,
             "candidate_profile": candidate_profile,
             "match_analysis": match_analysis,
@@ -51,4 +62,18 @@ class JobAgentOrchestrator:
                 "sources": sources,
             },
         }
+
+        if save_log:
+            try:
+                log_id = save_analysis(
+                    jd_text=jd_text,
+                    candidate_text=candidate_text,
+                    target_role=target_role,
+                    result=result,
+                )
+                result["meta"]["log_id"] = log_id
+            except Exception as exc:
+                logger.warning("日志保存失败，不影响主流程: %s", exc)
+
+        return result
 
