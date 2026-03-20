@@ -26,9 +26,10 @@ class JobAgentOrchestrator:
             target_role=target_role,
         )
         project_rewrite = self.resume_rewriter.rewrite(
-            candidate_text=candidate_text,
+            candidate_profile=candidate_profile,
             target_role=target_role,
-            jd_keywords=jd_analysis.get("keywords", []),
+            jd_analysis=jd_analysis,
+            rewrite_focus=match_analysis.get("rewrite_focus", []),
         )
 
         sources = {
