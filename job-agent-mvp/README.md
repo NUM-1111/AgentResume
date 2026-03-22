@@ -60,32 +60,74 @@ job-agent-mvp/
     formatter.py
 ```
 
-## 5. 快速开始
+## 5. 环境与启动
 
-### 5.1 安装依赖
+### 5.1 环境要求
 
-```bash
-pip install -r requirements.txt
+- **Python 3.10+**（推荐 3.12）
+- 依赖见 `requirements.txt`（与代码中的 `import` 一致：FastAPI、Uvicorn、Streamlit、Pydantic、python-dotenv、OpenAI SDK、httpx）
+
+### 5.2 推荐：仓库根目录一键配置（虚拟环境 + 依赖 + `.env` 占位）
+
+在 **`AgentResume` 仓库根目录**（与 `job-agent-mvp` 同级）执行其一：
+
+| 方式 | 命令 |
+|------|------|
+| PowerShell | `.\setup.ps1` |
+| CMD | `setup.bat` |
+
+脚本会：
+
+1. 在 `job-agent-mvp\.venv` 创建虚拟环境（优先使用 Windows 的 `py -3`，否则 `python`）
+2. 执行 `pip install -r requirements.txt`
+3. 若存在 `.env.example` 且尚无 `.env`，则复制为 `.env`（可再编辑 API Key）
+
+完成后在同一目录启动：
+
+| 方式 | 命令 |
+|------|------|
+| PowerShell | `.\start.ps1` |
+| CMD | `start.bat` |
+
+启动脚本会使用 **`.venv` 内的 Python** 分别拉起 FastAPI（8000）与 Streamlit（8501）。
+
+### 5.3 手动配置（与早期文档步骤一致，便于对照）
+
+在终端进入 **`job-agent-mvp`** 目录：
+
+**Windows（PowerShell 示例）**
+
+```powershell
+cd job-agent-mvp
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+# 按需编辑 .env 中的 OPENAI_API_KEY 等
 ```
 
-### 5.2 配置环境变量
-
-复制 `.env.example` 为 `.env`，填入你的 API Key：
+**macOS / Linux**
 
 ```bash
+cd job-agent-mvp
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-### 5.3 启动 FastAPI
+**启动服务**（需已激活上述虚拟环境，且在 `job-agent-mvp` 下）：
 
 ```bash
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+另开终端（同样激活 `.venv`）：
+
+```bash
+streamlit run app.py --server.port 8501
 ```
 
 接口：
@@ -93,11 +135,13 @@ uvicorn main:app --reload --port 8000
 - `GET /health`
 - `POST /analyze`
 
-### 5.4 启动 Streamlit 页面
+### 5.4 配置环境变量（LLM）
 
-```bash
-streamlit run app.py
-```
+复制 `.env.example` 为 `.env`，按需填写（无 Key 时仍可走本地降级逻辑）：
+
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL`（可选，默认 OpenAI 官方）
+- `OPENAI_MODEL`（可选，默认 `gpt-4o-mini`）
 
 ## 6. 输入输出说明
 
