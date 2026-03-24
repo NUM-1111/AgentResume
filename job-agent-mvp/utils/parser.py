@@ -70,6 +70,22 @@ _PERIOD_RE = re.compile(
 _TECH_STACK_RE = re.compile(r"^[\w\s\+\./]+(?:,\s*[\w\s\+\./]+){2,}$")
 
 
+_SUSPICIOUS_INSTRUCTION_PATTERNS = [
+    r"忽略.*规则",
+    r"帮我.*写得很厉害",
+    r"多加.*数据.*成果",
+    r"ignore .*instructions?",
+    r"make .*resume.*strong",
+]
+
+
+def _looks_like_prompt_injection(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    return any(re.search(pattern, stripped, re.IGNORECASE) for pattern in _SUSPICIOUS_INSTRUCTION_PATTERNS)
+
+
 def _is_section_header(line: str) -> bool:
     """判断是否为章节标题行（如'项目经历'、'核心技能'）"""
     stripped = line.strip()
@@ -80,6 +96,17 @@ def _is_section_header(line: str) -> bool:
     if stripped.startswith("#"):
         return True
     return False
+
+
+def _looks_like_role_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or len(stripped) > 20:
+        return False
+    if any(sep in stripped for sep in ["，", ",", "；", ";", "。", ":", "："]):
+        return False
+    role_keywords = ["工程师", "开发", "负责人", "实习", "leader", "manager", "owner"]
+    return any(keyword in stripped.lower() for keyword in role_keywords)
+
 
 
 def _parse_project_block(lines: List[str]) -> Dict[str, Any]:
@@ -133,16 +160,22 @@ def _parse_project_block(lines: List[str]) -> Dict[str, Any]:
             project["tech_stack"] = [t.strip() for t in tech_raw.split(",") if t.strip()]
             continue
 
-        # 成就描述行（以 • - * 开头，或行内有动词）
+        # 成就描述行（以 • - * 开头）
         if stripped.startswith(("•", "-", "*")):
             highlight = stripped.lstrip("•-* ").strip()
             if highlight:
                 project["highlights"].append(highlight)
             continue
 
-        # 其他行：如果项目名还没有，尝试作为项目名
+        if not project["role"] and _looks_like_role_line(stripped):
+            project["role"] = stripped
+            continue
+
+        # 其他非空行默认视为项目事实亮点，兼容软换行/自由排版简历
         if not project["name"] and i == 0:
             project["name"] = stripped[:60]
+        else:
+            project["highlights"].append(stripped)
 
     return project
 
@@ -250,7 +283,7 @@ def _parse_projects_from_section(section_text: str) -> List[Dict[str, Any]]:
 
     for line in lines:
         stripped = line.strip()
-        if not stripped:
+        if not stripped or _looks_like_prompt_injection(stripped):
             continue
         # 新项目的开始：包含时间段的行
         if _PERIOD_RE.search(stripped) and current_block:
